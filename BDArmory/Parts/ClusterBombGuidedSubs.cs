@@ -9,7 +9,7 @@ using UnityEngine;
 
 namespace BDArmory.Parts
 {
-    public class ClusterBomb : PartModule
+    public class ClusterBombGuidedSubs : PartModule
     {
         List<GameObject> submunitions;
         List<GameObject> fairings;
@@ -161,7 +161,35 @@ namespace BDArmory.Parts
         }
     }
 
+        public static Vector3 GetAirToGroundTarget(Vector3 targetPosition, Vessel missileVessel, float descentRatio)
+        {
+            Vector3 upDirection = missileVessel.upAxis;
+            //-FlightGlobals.getGeeForceAtPosition(targetPosition).normalized;
+            Vector3 surfacePos = missileVessel.transform.position +
+                                 Vector3.Project(targetPosition - missileVessel.transform.position, upDirection);
+            //((float)missileVessel.altitude*upDirection);
+            Vector3 targetSurfacePos;
 
+            targetSurfacePos = targetPosition;
+
+            float distanceToTarget = Vector3.Distance(surfacePos, targetSurfacePos);
+
+            if (missileVessel.srfSpeed < 75 && missileVessel.verticalSpeed < 10)
+                //gain altitude if launching from stationary
+            {
+                return missileVessel.transform.position + (5*missileVessel.transform.forward) + (1*upDirection);
+            }
+
+            Vector3 finalTarget = targetPosition +
+                                  (Mathf.Clamp(
+                                       (distanceToTarget - ((float) missileVessel.srfSpeed*descentRatio))*0.22f, 0, 5000)*
+                                   upDirection);
+
+
+            //Debug.Log("Using agm trajectory. " + Time.time);
+
+            return finalTarget;
+        }
     public class Submunition : MonoBehaviour
     {
         public bool deployed;
@@ -187,16 +215,47 @@ namespace BDArmory.Parts
             prevPosition = transform.position;
             rb = GetComponent<Rigidbody>();
         }
+        
+        
 
         void FixedUpdate()
         {
             if (deployed)
             {
-                if (Time.time - startTime > 30)
+                if (Time.time - startTime > 60)
                 {
                     Destroy(gameObject);
                     return;
                 }
+                if (airSpeed > 1)
+                {
+                Vector3 targetDirection;
+                float targetAngle;
+                if (1==1)
+                {
+                    targetDirection = (targetPosition - missileLauncher.transform.position);
+                    targetAngle = Vector3.Angle(velocity.normalized, targetDirection)*4;
+                }
+
+                Vector3 torqueDirection = -Vector3.Cross(targetDirection, velocity.normalized).normalized;
+                torqueDirection = missileLauncher.transform.InverseTransformDirection(torqueDirection);
+
+                float torque = Mathf.Clamp(targetAngle, 0, maxTorque);
+                Vector3 finalTorque = Vector3.ProjectOnPlane(Vector3.Lerp(previousTorque, torqueDirection*torque, 1),
+                    Vector3.forward);
+
+                rb.AddRelativeTorque(finalTorque);
+
+                return finalTorque;
+            }
+            else
+            {
+                Vector3 finalTorque = Vector3.ProjectOnPlane(Vector3.Lerp(previousTorque, Vector3.zero, 0.25f),
+                    Vector3.forward);
+                rb.AddRelativeTorque(finalTorque);
+                return finalTorque;
+            }
+        }
 
                 //floatingOrigin fix
                 if (sourceVessel != null &&
@@ -204,6 +263,7 @@ namespace BDArmory.Parts
                 {
                     transform.position = sourceVessel.transform.position + relativePos +
                                          (rb.velocity*Time.fixedDeltaTime);
+                                         
                 }
                 if (sourceVessel != null) relativePos = transform.position - sourceVessel.transform.position;
                 //
