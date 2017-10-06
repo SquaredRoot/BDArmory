@@ -34,7 +34,24 @@ namespace BDArmory.Parts
 
         [KSPField(isPersistant = false)] public bool swapCollidersOnDeploy = true;
 
+      public ModuleTargetingCamera lockedCamera;
+        protected Vector3 lastLaserPoint;
+        protected Vector3 laserStartPosition;
+        protected Vector3 startDirection;
 
+     protected void SetLaserTargeting()
+        {
+            if (TargetingMode == TargetingModes.Laser)
+            {
+                laserStartPosition = MissileReferenceTransform.position;
+                if (lockedCamera)
+                {
+                    TargetAcquired = true;
+                    TargetPosition = lastLaserPoint = lockedCamera.groundTargetPosition;
+                    targetingPod = lockedCamera;
+                }
+            }
+        }
         public override void OnStart(StartState state)
         {
             submunitions = new List<GameObject>();
